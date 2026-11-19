@@ -2,7 +2,7 @@ import json
 import requests
 api_url = "http://localhost:58000/api/v1/host"
 
-headers={"X-Auth-Token": "NC-144-d131174a867340c3a5a8-nbi"}
+headers={"X-Auth-Token": "NC-5-2b8175999db24ce4bdcb-nbi"}
 
 resp = requests.get(api_url, headers=headers, verify=False)
 
