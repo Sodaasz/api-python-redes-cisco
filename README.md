@@ -1,45 +1,82 @@
-# Entorno de virtualización Python
+# TP N° 4 - Integrador - Redes de Computadoras (3643) - Grupo 01
 
-# Pasos de instalación en Linux:
+Scripts de Python que interactúan con la API REST (Northbound API) del Network Controller de Packet Tracer.
+Repositorio basado en el de la cátedra: [redes-computadoras/api-python-redes-cisco](https://github.com/redes-computadoras/api-python-redes-cisco).
 
-## 1. Clonación del proyecto
+## Requisitos
 
-Desde la terminal ejecutar:
+- Packet Tracer 9.0.1 abierto, con el archivo del TP y el Network Controller funcionando.
+- La API se consulta en `http://localhost:58000/api/v1`.
+- Python 3.10 o superior.
 
-**git clone** <URL_del_repositorio> <nombre_de_la_carpeta_de_destino>
+## Preparación
 
-Luego ejecutar **cd** <nombre_de_la_carpeta_de_destino>. Esta carpeta será la raíz de nuestro proyecto en Python.
+```
+python -m venv cisco
+cisco\Scripts\activate          # Windows  (Linux/Mac: source cisco/bin/activate)
+pip install -r requirements.txt
+```
 
-## 2. Creación del entorno virtual
+El entorno virtual (`cisco/`) y los archivos `.env` **no** se suben al repositorio.
 
-Supongamos que el nombre que le damos al entorno virtual es **cisco**, entonces se creará una carpeta **cisco** con todas las librerías y dependencias necesarias paea nuestro proyecto. 
+## Credenciales
 
-La manera de realizarlo es la siguiente:
+Los scripts usan el usuario y la clave **del controlador** (no los de los equipos de red),
+que son los registrados en la pantalla de inicio de sesión del Network Controller:
+usuario `cisco` y clave `cisco123`.
 
-# python3 -m venv <nombre_del_entorno>
-Ejemplo: python3 -m venv cisco
+Si el controlador tiene otras credenciales, hay que cambiarlas en `01_get-ticket.py`,
+`02_get-network-device.py`, `04_tabulate.py` y `05_reporte_gestion.py`
+(en este último también se pueden pasar por las variables de entorno `NC_USER` y `NC_PASS`).
 
-Para activar el entorno escribimos **source cisco/bin/activate**, en la carpeta raíz del proyecto. El nombre del entorno virtual aparecerá entre paréntesis ().
+## Scripts
 
-## 3. Instalación de las dependencias, en este caso las librerías requests y tabulate
+| Script | Origen | Qué hace |
+|---|---|---|
+| `src/01_get-ticket.py` | Cátedra | `POST /ticket`: pide el ticket de autenticación (`X-Auth-Token`) y lo muestra. |
+| `src/02_get-network-device.py` | Cátedra (modificado) | `GET /network-device`: lista hostname, plataforma e IP de gestión de los equipos. |
+| `src/03_get-host.py` | Cátedra | `GET /host`: lista los hosts detectados con IP, MAC e interfaz de acceso. Requiere pegar un ticket vigente en el header `X-Auth-Token`. |
+| `src/04_tabulate.py` | Cátedra (modificado) | Pide su propio ticket y muestra en tablas los equipos de red y los hosts. |
+| `src/05_reporte_gestion.py` | **Grupo 01** | Script propio: verifica la gestión de la red desde el controlador y genera un reporte JSON. |
 
-En la carpeta raíz de nuestro proyecto y dentro del entorno virtual escribimos: **pip install -r requirements.txt**
+### Modificaciones a los scripts de la cátedra
 
-## 4. Selección del intérprete Python para nuestro entorno virtual
+El ISP está fuera del sistema autónomo y no tiene cargada la credencial en el controlador,
+por lo que aparece con estado *Wrong credential* y **sin `hostname`** en `GET /network-device`.
+Los scripts originales fallaban con `KeyError: 'hostname'` al llegar a ese equipo.
+Se reemplazó el acceso `equipo["campo"]` por `equipo.get("campo", valor_por_defecto)` en
+`02_get-network-device.py` y `04_tabulate.py`. En `02` además se pide el ticket de forma
+automática y se muestra una tabla en lugar del JSON completo.
 
-<img width="881" height="118" alt="image" src="https://github.com/user-attachments/assets/18c41d8e-d338-48b6-953c-b2499c57319f" />
+### Script propio: `05_reporte_gestion.py`
 
-<img width="736" height="412" alt="image" src="https://github.com/user-attachments/assets/2a795fcd-2cf8-47ef-a5a6-d21e09ce967f" />
+Compara los equipos que ve el controlador (`GET /network-device`) contra la lista de
+equipos esperados de la topología (constante `ESPERADOS`, al inicio del script) y detecta:
 
-Tal como se ve en la figura seleccionamos Python 3.10.12 (cisco) que se mostrará como entorno recomendado.
+- equipos esperados que **no aparecen** en el inventario,
+- equipos que aparecen pero **no están en estado Managed**,
+- equipos **fuera de la lista** (por ejemplo, el ISP),
+- cantidad de **hosts por interfaz de acceso** (`GET /host`).
 
-## 5. Desactivación del entorno virtual
+Muestra tablas por consola y guarda un reporte JSON con fecha y hora. Termina con código
+de salida `0` si todo está gestionado, o `1` si falta algún equipo o alguno no está Managed.
+Tolera equipos sin hostname.
 
-Simplemente escribimos en la línea de comandos: **deactivate**
+```
+python src/05_reporte_gestion.py                  # genera reporte_gestion.json
+python src/05_reporte_gestion.py otro_nombre.json # nombre a elección
+```
 
+Variables de entorno opcionales: `NC_URL` (por defecto `http://localhost:58000/api/v1`),
+`NC_USER` (por defecto `cisco`) y `NC_PASS`.
 
+## Orden de ejecución sugerido
 
-## Antes de ejecutar los scripts
+1. `python src/01_get-ticket.py`: copiar el ticket que muestra.
+2. Pegar el ticket en el header `X-Auth-Token` de `src/03_get-host.py` y ejecutarlo.
+3. `python src/02_get-network-device.py`
+4. `python src/04_tabulate.py`
+5. `python src/05_reporte_gestion.py`
 
-- **Credenciales del controlador:** los scripts usan el usuario `cisco` y la clave `cisco123!`. Si en tu Network Controller creaste otro usuario, cambialos en `01_get-ticket.py` y en `04_tabulate.py`.
-- **Ticket (X-Auth-Token):** `02_get-network-device.py` y `03_get-host.py` traen escrito un ticket de ejemplo que **no va a funcionar** en tu Packet Tracer, porque el controlador genera uno nuevo en cada sesión y vence. Ejecutá primero `01_get-ticket.py`, copiá el ticket que muestra y reemplazalo en el header `X-Auth-Token` de esos dos scripts. `04_tabulate.py` no necesita este paso: pide el ticket solo.
+Los tickets vencen al cerrar o reabrir Packet Tracer: si un script devuelve `403 invalid ticket`,
+hay que pedir uno nuevo con el script 01.
